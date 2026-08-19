@@ -3,11 +3,12 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import RealtimeDashboardPage from './components/RealtimeDashboardPage';
 import MachineListPage from './components/MachineListPage';
 import MachineDetailPage from './components/MachineDetailPage';
 import MachineFormPage from './components/MachineFormPage';
 import SensorListPage from './components/SensorListPage';
-import { Activity, Server, Cpu, LogOut, UserCheck } from 'lucide-react';
+import { Activity, Server, Cpu, LayoutDashboard, LogOut, UserCheck } from 'lucide-react';
 
 function NavigationHeader({ currentRoute, onNavigate }) {
   const { user, role, logout } = useAuth();
@@ -20,14 +21,25 @@ function NavigationHeader({ currentRoute, onNavigate }) {
           Industrial Predictive Maintenance Platform
         </h1>
         <p className="text-slate-400 text-sm mt-1">
-          Real-time Asset Telemetry, AI Anomaly Detection & Asset Intelligence Operations
+          Real-Time Asset Telemetry, AI Failure Anomaly Detection & Asset Intelligence Operations
         </p>
 
         {/* Navigation Tabs */}
         <nav className="flex items-center gap-2 mt-4">
           <button
+            onClick={() => onNavigate('/')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+              currentRoute === '/' || currentRoute === '/dashboard'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" /> Real-time Dashboard
+          </button>
+
+          <button
             onClick={() => onNavigate('/machines')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
               currentRoute.startsWith('/machines')
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
@@ -38,7 +50,7 @@ function NavigationHeader({ currentRoute, onNavigate }) {
 
           <button
             onClick={() => onNavigate('/sensors')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
               currentRoute.startsWith('/sensors')
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
@@ -81,7 +93,7 @@ function NavigationHeader({ currentRoute, onNavigate }) {
 function MainApp() {
   const { isAuthenticated, loading } = useAuth();
   const [authView, setAuthView] = useState('login'); // 'login' | 'register'
-  const [route, setRoute] = useState('/machines');
+  const [route, setRoute] = useState('/');
   const [activeMachineId, setActiveMachineId] = useState(null);
 
   if (loading) {
@@ -110,7 +122,11 @@ function MainApp() {
         <NavigationHeader currentRoute={route} onNavigate={(path) => navigateTo(path)} />
 
         {/* Route Handler */}
-        {route === '/sensors' ? (
+        {route === '/' || route === '/dashboard' ? (
+          <RealtimeDashboardPage
+            onSelectMachine={(id) => navigateTo('/machines/detail', id)}
+          />
+        ) : route === '/sensors' ? (
           <SensorListPage />
         ) : route === '/machines/new' ? (
           <MachineFormPage
