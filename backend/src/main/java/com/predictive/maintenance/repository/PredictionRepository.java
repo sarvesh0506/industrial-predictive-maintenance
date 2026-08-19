@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface PredictionRepository extends JpaRepository<Prediction, Long> {
     List<Prediction> findByMachineIdOrderByPredictionTimeDesc(Long machineId);
+    org.springframework.data.domain.Page<Prediction> findByMachineId(Long machineId, org.springframework.data.domain.Pageable pageable);
 }
