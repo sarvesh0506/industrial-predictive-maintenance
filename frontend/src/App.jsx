@@ -11,7 +11,8 @@ import SensorListPage from './components/SensorListPage';
 import MaintenanceDashboardPage from './components/MaintenanceDashboardPage';
 import AlertsCenterPage from './components/AlertsCenterPage';
 import AnalyticsDashboardPage from './components/AnalyticsDashboardPage';
-import { Activity, Server, Cpu, LayoutDashboard, LogOut, UserCheck, Wrench, Bell, TrendingUp } from 'lucide-react';
+import AdminPanelPage from './components/AdminPanelPage';
+import { Activity, Server, Cpu, LayoutDashboard, LogOut, UserCheck, Wrench, Bell, TrendingUp, ShieldCheck } from 'lucide-react';
 
 function NavigationHeader({ currentRoute, onNavigate }) {
   const { user, role, logout } = useAuth();
@@ -94,6 +95,19 @@ function NavigationHeader({ currentRoute, onNavigate }) {
           >
             <TrendingUp className="w-3.5 h-3.5" /> Analytics & KPIs
           </button>
+
+          {role === 'ADMIN' && (
+            <button
+              onClick={() => onNavigate('/admin')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                currentRoute.startsWith('/admin')
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'bg-slate-800 text-purple-300 hover:bg-slate-700 hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" /> Admin Panel
+            </button>
+          )}
         </nav>
       </div>
 
@@ -174,6 +188,10 @@ function MainApp() {
           />
         ) : route === '/analytics' ? (
           <AnalyticsDashboardPage />
+        ) : route === '/admin' ? (
+          <AdminPanelPage
+            onNavigateTab={(path) => navigateTo(path)}
+          />
         ) : route === '/machines/new' ? (
           <MachineFormPage
             onBack={() => navigateTo('/machines')}
