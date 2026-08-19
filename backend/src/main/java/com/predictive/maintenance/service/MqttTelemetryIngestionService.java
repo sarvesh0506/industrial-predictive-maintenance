@@ -36,6 +36,7 @@ public class MqttTelemetryIngestionService {
     private final SensorRepository sensorRepository;
     private final SensorReadingRepository sensorReadingRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final AlertService alertService;
 
     @Transactional
     public SensorReadingResponseDTO processTelemetryPayload(String topic, String jsonPayload) {
@@ -113,6 +114,9 @@ public class MqttTelemetryIngestionService {
         SensorReading savedReading = sensorReadingRepository.save(reading);
         log.info("Successfully persisted telemetry reading for sensor [{}] (Machine: {}): {} {}", 
                 sensorCode, machineCode, savedReading.getValue(), sensor.getUnit());
+
+        // Evaluate Configurable Sensor Thresholds for Real-Time Alerts
+        alertService.evaluateSensorReadingThresholds(machine, sensor, savedReading.getValue());
 
         // Build Response DTO
         SensorReadingResponseDTO responseDTO = SensorReadingResponseDTO.builder()

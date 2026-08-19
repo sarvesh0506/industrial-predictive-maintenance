@@ -9,7 +9,8 @@ import MachineDetailPage from './components/MachineDetailPage';
 import MachineFormPage from './components/MachineFormPage';
 import SensorListPage from './components/SensorListPage';
 import MaintenanceDashboardPage from './components/MaintenanceDashboardPage';
-import { Activity, Server, Cpu, LayoutDashboard, LogOut, UserCheck, Wrench } from 'lucide-react';
+import AlertsCenterPage from './components/AlertsCenterPage';
+import { Activity, Server, Cpu, LayoutDashboard, LogOut, UserCheck, Wrench, Bell } from 'lucide-react';
 
 function NavigationHeader({ currentRoute, onNavigate }) {
   const { user, role, logout } = useAuth();
@@ -26,7 +27,7 @@ function NavigationHeader({ currentRoute, onNavigate }) {
         </p>
 
         {/* Navigation Tabs */}
-        <nav className="flex items-center gap-2 mt-4">
+        <nav className="flex flex-wrap items-center gap-2 mt-4">
           <button
             onClick={() => onNavigate('/')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
@@ -58,6 +59,17 @@ function NavigationHeader({ currentRoute, onNavigate }) {
             }`}
           >
             <Cpu className="w-3.5 h-3.5" /> Telemetry Sensors
+          </button>
+
+          <button
+            onClick={() => onNavigate('/alerts')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+              currentRoute.startsWith('/alerts')
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <Bell className="w-3.5 h-3.5" /> Alert Center
           </button>
 
           <button
@@ -140,6 +152,10 @@ function MainApp() {
           />
         ) : route === '/sensors' ? (
           <SensorListPage />
+        ) : route === '/alerts' ? (
+          <AlertsCenterPage
+            onNavigateMachine={(id) => navigateTo('/machines/detail', id)}
+          />
         ) : route === '/maintenance' ? (
           <MaintenanceDashboardPage
             onNavigateMachine={(id) => navigateTo('/machines/detail', id)}
