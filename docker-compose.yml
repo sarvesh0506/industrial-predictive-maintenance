@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: ipm-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: predictive_maintenance_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d predictive_maintenance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: ipm-mqtt
+    restart: always
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ipm-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/predictive_maintenance_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgrespassword
+    depends_on:
+      database:
+        condition: service_healthy
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: ipm-ml-service
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ipm-frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+      - ml-service
+
+volumes:
+  postgres_data:

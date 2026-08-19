@@ -1,0 +1,29 @@
+graph TD
+    subgraph Edge Layer
+        Simulator["IoT Simulator Script"]
+        PhysicalSensors["Industrial Machine Sensors"]
+    end
+
+    subgraph Messaging Layer
+        MQTT["Eclipse Mosquitto Broker"]
+    end
+
+    subgraph Application Core
+        Backend["Spring Boot 3 Backend API"]
+        Database[("PostgreSQL Database")]
+    end
+
+    subgraph AI Intelligence
+        MLService["FastAPI Machine Learning Service"]
+    end
+
+    subgraph Presentation Layer
+        Frontend["React + Vite Dashboard"]
+    end
+
+    Simulator -->|MQTT Telemetry| MQTT
+    PhysicalSensors -->|MQTT Telemetry| MQTT
+    MQTT -->|Inbound Streams| Backend
+    Frontend <-->|REST API / WebSockets| Backend
+    Backend <-->|JPA Repositories| Database
+    Backend <-->|Inference Calls| MLService
