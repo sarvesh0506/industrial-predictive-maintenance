@@ -90,7 +90,7 @@ public class Machine {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        if (this.status == null) this.status = "OPERATIONAL";
+        if (this.status == null) this.status = "RUNNING";
         if (this.criticality == null) this.criticality = "MEDIUM";
     }
 
