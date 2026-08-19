@@ -43,6 +43,15 @@ class FailureScenario(Enum):
     MOTOR_DEGRADATION = "MOTOR_DEGRADATION"
     COMBINED_DEGRADATION = "COMBINED_DEGRADATION"
 
+UNITS = {
+    "temperature": "°C",
+    "vibration": "mm/s",
+    "pressure": "bar",
+    "rpm": "RPM",
+    "current": "A",
+    "voltage": "V"
+}
+
 class VirtualMachine:
     """
     Virtual Machine asset representing physical machinery dynamics,
@@ -68,6 +77,9 @@ class VirtualMachine:
         self.active_scenario = None
         self.degradation_step = 0
         self.step_counter = 0
+
+    def tick(() -> dict:
+        pass
 
     def tick(self) -> dict:
         self.step_counter += 1
@@ -110,29 +122,24 @@ class VirtualMachine:
             step_factor = self.degradation_step * (2.2 if self.mode == OperatingMode.FAILURE else 1.0)
 
             if self.active_scenario == FailureScenario.BEARING_DEGRADATION:
-                # Vibration increases exponentially
                 vib += (0.6 * math.exp(step_factor * 0.25)) + random.gauss(0, 0.4)
                 temp += (step_factor * 0.8)
 
             elif self.active_scenario == FailureScenario.OVERHEATING:
-                # Temperature ramps steeply
                 temp += (step_factor * 2.5) + random.gauss(0, 0.8)
                 curr += (step_factor * 0.4)
 
             elif self.active_scenario == FailureScenario.PRESSURE_INSTABILITY:
-                # Unstable pressure oscillations & spikes
                 press += (math.sin(self.step_counter * 0.8) * step_factor * 0.9) + random.gauss(0, 0.6)
                 if press < 1.0: press = 1.0
 
             elif self.active_scenario == FailureScenario.MOTOR_DEGRADATION:
-                # Current surge while RPM decays due to rotational drag
                 curr += (step_factor * 1.4) + random.gauss(0, 0.5)
                 rpm -= (step_factor * 85.0) + random.gauss(0, 15.0)
                 vib += (step_factor * 0.4)
                 if rpm < 500: rpm = 500.0
 
             elif self.active_scenario == FailureScenario.COMBINED_DEGRADATION:
-                # Multi-sensor cascade failure
                 vib += (step_factor * 0.5)
                 temp += (step_factor * 1.8)
                 curr += (step_factor * 0.9)
@@ -147,13 +154,38 @@ class VirtualMachine:
         curr = max(0.0, round(curr, 2))
         volt = max(300.0, round(volt, 1))
 
+        iso_timestamp = datetime.now(timezone.utc).isoformat()
+
+        # Build list of individual sensor payloads according to MQTT Pipeline schema:
+        # { machineId, sensorId, sensorType, value, unit, timestamp }
+        sensor_payloads = []
+        metrics = {
+            "TEMPERATURE": temp,
+            "VIBRATION": vib,
+            "PRESSURE": press,
+            "RPM": rpm,
+            "CURRENT": curr,
+            "VOLTAGE": volt
+        }
+
+        for stype, sval in metrics.items():
+            sensor_payloads.append({
+                "machineId": self.code,
+                "sensorId": f"SNR-{stype}-{self.code}",
+                "sensorType": stype,
+                "value": sval,
+                "unit": UNITS[stype.lower()],
+                "timestamp": iso_timestamp
+            })
+
         return {
-            "machine_code": self.code,
-            "machine_name": self.name,
-            "machine_type": self.machine_type,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "machineId": self.code,
+            "machineName": self.name,
+            "machineType": self.machine_type,
+            "timestamp": iso_timestamp,
             "mode": self.mode.value,
-            "failure_scenario": self.active_scenario.value if self.active_scenario else "NONE",
+            "failureScenario": self.active_scenario.value if self.active_scenario else "NONE",
+            "sensors": sensor_payloads,
             "telemetry": {
                 "temperature": temp,
                 "vibration": vib,
@@ -168,7 +200,8 @@ class VirtualMachine:
 class TelemetrySimulator:
     """
     Orchestrates virtual industrial machines, handles environment variable configurations,
-    logs telemetry output, and publishes JSON payloads over MQTT.
+    logs telemetry output, and publishes JSON payloads over MQTT topic pattern:
+    factory/{machineId}/sensor/{sensorType}
     """
     def __init__(self):
         # Load Configurations from Environment Variables
@@ -176,7 +209,6 @@ class TelemetrySimulator:
         self.publish_interval = float(os.getenv("SIMULATOR_PUBLISH_INTERVAL", "5.0"))
         self.mqtt_broker = os.getenv("MQTT_BROKER_URL", os.getenv("MQTT_HOST", "localhost"))
         self.mqtt_port = int(os.getenv("MQTT_PORT", "1883"))
-        self.mqtt_topic_prefix = os.getenv("MQTT_TOPIC_PREFIX", "industrial/telemetry")
         self.failure_probability = float(os.getenv("SIMULATOR_FAILURE_PROBABILITY", "0.15"))
         self.seed = os.getenv("SIMULATOR_RANDOM_SEED")
 
@@ -210,7 +242,7 @@ class TelemetrySimulator:
             logger.info("paho-mqtt library not detected. Operating in console logging mode.")
 
     def run(self, max_iterations=None):
-        logger.info(f"Starting Simulator Loop. Interval: {self.publish_interval}s. Machines: {self.num_machines}")
+        logger.info(f"Starting MQTT Pipeline Simulator Loop. Interval: {self.publish_interval}s. Machines: {self.num_machines}")
         iterations = 0
 
         try:
@@ -219,24 +251,26 @@ class TelemetrySimulator:
                 logger.info(f"--- Simulating Telemetry Frame #{iterations} ---")
                 
                 for machine in self.machines:
-                    payload = machine.tick()
-                    payload_json = json.dumps(payload)
+                    data = machine.tick()
 
                     # Log formatted status
-                    mode_str = payload['mode']
-                    scenario_str = payload['failure_scenario']
-                    t = payload['telemetry']
+                    mode_str = data['mode']
+                    scenario_str = data['failureScenario']
+                    t = data['telemetry']
                     
                     logger.info(
-                        f"[{payload['machine_code']}] Mode: {mode_str:8s} | Scenario: {scenario_str:21s} | "
+                        f"[{data['machineId']}] Mode: {mode_str:8s} | Scenario: {scenario_str:21s} | "
                         f"Temp: {t['temperature']:5.1f}°C | Vib: {t['vibration']:4.1f}mm/s | "
                         f"Press: {t['pressure']:4.1f}bar | RPM: {t['rpm']:6.1f} | Curr: {t['current']:5.1f}A"
                     )
 
-                    # Publish over MQTT if connected
-                    if self.mqtt_client:
-                        topic = f"{self.mqtt_topic_prefix}/{payload['machine_code']}"
-                        self.mqtt_client.publish(topic, payload_json)
+                    # Publish each sensor reading over topic format: factory/{machineId}/sensor/{sensorType}
+                    for sensor_payload in data["sensors"]:
+                        topic = f"factory/{sensor_payload['machineId']}/sensor/{sensor_payload['sensorType'].lower()}"
+                        payload_json = json.dumps(sensor_payload)
+
+                        if self.mqtt_client:
+                            self.mqtt_client.publish(topic, payload_json)
 
                 if max_iterations and iterations >= max_iterations:
                     logger.info(f"Completed requested {max_iterations} simulation iterations.")

@@ -56,7 +56,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
-                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/health", "/h2-console/**").permitAll()
+                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/health", "/ws/**", "/h2-console/**").permitAll()
                 
                 // Read-only access for OPERATOR, ENGINEER, ADMIN
                 .requestMatchers(HttpMethod.GET, "/api/machines/**", "/api/sensors/**", "/api/sensor-readings/**").hasAnyRole("ADMIN", "ENGINEER", "OPERATOR")
