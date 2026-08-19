@@ -29,8 +29,9 @@ public class User {
     @Column(name = "full_name", length = 100)
     private String fullName;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private String role;
+    private Role role;
 
     @Column(nullable = false, length = 20)
     private String status;
@@ -45,7 +46,7 @@ public class User {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        if (this.role == null) this.role = "TECHNICIAN";
+        if (this.role == null) this.role = Role.OPERATOR;
         if (this.status == null) this.status = "ACTIVE";
     }
 
