@@ -6,7 +6,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import MachineListPage from './components/MachineListPage';
 import MachineDetailPage from './components/MachineDetailPage';
 import MachineFormPage from './components/MachineFormPage';
-import { Activity, Server, LogOut, UserCheck, LayoutDashboard } from 'lucide-react';
+import SensorListPage from './components/SensorListPage';
+import { Activity, Server, Cpu, LogOut, UserCheck } from 'lucide-react';
 
 function NavigationHeader({ currentRoute, onNavigate }) {
   const { user, role, logout } = useAuth();
@@ -22,7 +23,7 @@ function NavigationHeader({ currentRoute, onNavigate }) {
           Real-time Asset Telemetry, AI Anomaly Detection & Asset Intelligence Operations
         </p>
 
-        {/* Route Navigation Tabs */}
+        {/* Navigation Tabs */}
         <nav className="flex items-center gap-2 mt-4">
           <button
             onClick={() => onNavigate('/machines')}
@@ -34,10 +35,21 @@ function NavigationHeader({ currentRoute, onNavigate }) {
           >
             <Server className="w-3.5 h-3.5" /> Machine Inventory
           </button>
+
+          <button
+            onClick={() => onNavigate('/sensors')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+              currentRoute.startsWith('/sensors')
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <Cpu className="w-3.5 h-3.5" /> Telemetry Sensors
+          </button>
         </nav>
       </div>
 
-      {/* User Info & Logout Button */}
+      {/* User Info & Logout */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2.5 bg-slate-800 px-3.5 py-1.5 rounded-lg border border-slate-700">
           <UserCheck className="w-4 h-4 text-blue-400" />
@@ -69,7 +81,7 @@ function NavigationHeader({ currentRoute, onNavigate }) {
 function MainApp() {
   const { isAuthenticated, loading } = useAuth();
   const [authView, setAuthView] = useState('login'); // 'login' | 'register'
-  const [route, setRoute] = useState('/machines'); // '/machines' | '/machines/new' | '/machines/:id' | '/machines/:id/edit'
+  const [route, setRoute] = useState('/machines');
   const [activeMachineId, setActiveMachineId] = useState(null);
 
   if (loading) {
@@ -98,7 +110,9 @@ function MainApp() {
         <NavigationHeader currentRoute={route} onNavigate={(path) => navigateTo(path)} />
 
         {/* Route Handler */}
-        {route === '/machines/new' ? (
+        {route === '/sensors' ? (
+          <SensorListPage />
+        ) : route === '/machines/new' ? (
           <MachineFormPage
             onBack={() => navigateTo('/machines')}
             onSuccess={() => navigateTo('/machines')}

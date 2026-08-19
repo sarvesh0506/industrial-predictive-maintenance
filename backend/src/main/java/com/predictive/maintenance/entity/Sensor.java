@@ -12,7 +12,9 @@ import java.util.List;
     name = "sensors",
     indexes = {
         @Index(name = "idx_sensors_code", columnList = "sensor_code"),
-        @Index(name = "idx_sensors_machine_id", columnList = "machine_id")
+        @Index(name = "idx_sensors_machine_id", columnList = "machine_id"),
+        @Index(name = "idx_sensors_type", columnList = "sensor_type"),
+        @Index(name = "idx_sensors_status", columnList = "status")
     }
 )
 @Getter
