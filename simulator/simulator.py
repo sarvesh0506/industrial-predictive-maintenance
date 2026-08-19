@@ -78,9 +78,6 @@ class VirtualMachine:
         self.degradation_step = 0
         self.step_counter = 0
 
-    def tick(() -> dict:
-        pass
-
     def tick(self) -> dict:
         self.step_counter += 1
         
