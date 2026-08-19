@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import StatusBadge from './StatusBadge';
 import CriticalityBadge from './CriticalityBadge';
-import { ArrowLeft, Cpu, Activity, AlertTriangle, Wrench, Brain, Calendar, MapPin, Factory, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Cpu, Activity, AlertTriangle, Wrench, Brain, Calendar, MapPin, Factory, ShieldCheck, Zap, Info, History } from 'lucide-react';
 
 export default function MachineDetailPage({ machineId, onBack, onNavigateEdit }) {
   const [detail, setDetail] = useState(null);
+  const [failurePred, setFailurePred] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const fetchMachineDetail = () => {
     setLoading(true);
     axios.get(`/api/machines/${machineId}/detail`)
       .then((res) => {
@@ -17,7 +19,6 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
         setLoading(false);
       })
       .catch(() => {
-        // Fallback to basic endpoint if detail fails
         axios.get(`/api/machines/${machineId}`)
           .then((res) => {
             setDetail({
@@ -35,6 +36,23 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
             setLoading(false);
           });
       });
+  };
+
+  const handleEvaluateFailure = () => {
+    setEvaluating(true);
+    axios.post(`/api/predictions/failure/evaluate?machineId=${machineId}`)
+      .then((res) => {
+        setFailurePred(res.data);
+        setEvaluating(false);
+        fetchMachineDetail(); // Refresh predictions list
+      })
+      .catch(() => {
+        setEvaluating(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchMachineDetail();
   }, [machineId]);
 
   if (loading) {
@@ -58,9 +76,18 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
     );
   }
 
+  const riskColor = (risk) => {
+    switch ((risk || '').toUpperCase()) {
+      case 'CRITICAL': return 'bg-red-500/20 text-red-400 border-red-500/40';
+      case 'HIGH': return 'bg-orange-500/20 text-orange-400 border-orange-500/40';
+      case 'MEDIUM': return 'bg-amber-500/20 text-amber-400 border-amber-500/40';
+      default: return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Top Header / Navigation Bar */}
+      {/* Top Header Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-800/80 p-5 rounded-2xl border border-slate-700 shadow-lg">
         <div className="flex items-center gap-3">
           <button
@@ -82,20 +109,30 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
           </div>
         </div>
 
-        <button
-          onClick={() => onNavigateEdit(detail.id)}
-          className="px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition-colors"
-        >
-          Edit Specifications
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleEvaluateFailure}
+            disabled={evaluating}
+            className="px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+          >
+            <Brain className={`w-4 h-4 ${evaluating ? 'animate-spin' : ''}`} />
+            {evaluating ? 'Evaluating AI Model...' : 'Evaluate Failure Risk'}
+          </button>
+          <button
+            onClick={() => onNavigateEdit(detail.id)}
+            className="px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition-colors"
+          >
+            Edit Specs
+          </button>
+        </div>
       </div>
 
-      {/* Grid Summary Row */}
+      {/* Summary Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Machine Specifications */}
         <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700 shadow-lg md:col-span-3">
           <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-            <Factory className="w-4 h-4 text-blue-400" /> Machine Specifications & Information
+            <Factory className="w-4 h-4 text-blue-400" /> Specifications & Location
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
             <div>
@@ -121,7 +158,7 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
           </div>
         </div>
 
-        {/* Health Score Gauge Card */}
+        {/* Health Index Card */}
         <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700 shadow-lg text-center flex flex-col justify-center items-center">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
             <ShieldCheck className="w-4 h-4 text-emerald-400" /> Health Index
@@ -129,16 +166,80 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
           <div className="text-4xl font-extrabold text-emerald-400 my-1">
             {detail.healthScore != null ? detail.healthScore : 94.2}%
           </div>
-          <span className="text-[11px] text-slate-400">Continuous telemetry score</span>
+          <span className="text-[11px] text-slate-400">Telemetry health baseline</span>
         </div>
       </div>
 
-      {/* Main Grid: Sensors & Latest Values + AI Predictions */}
+      {/* AI Failure Mode & Risk Evaluation Card */}
+      <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 shadow-lg space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <Brain className="w-5 h-5 text-indigo-400" /> AI Machine Failure Mode Prediction & Risk Assessment
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Supervised multi-class failure classification (RandomForest vs GradientBoosting candidates)
+            </p>
+          </div>
+          {failurePred && (
+            <span className={`text-xs font-extrabold px-3 py-1 rounded-full border ${riskColor(failurePred.riskLevel)}`}>
+              Risk Level: {failurePred.riskLevel}
+            </span>
+          )}
+        </div>
+
+        {failurePred ? (
+          <div className="bg-slate-900/70 p-5 rounded-xl border border-slate-700 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div>
+                <span className="text-slate-400 block mb-1">Predicted Failure Mode</span>
+                <span className="text-base font-extrabold text-indigo-300 block">{failurePred.predictedFailureType}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-1">Failure Probability</span>
+                <span className="text-base font-extrabold text-amber-400 block">
+                  {(failurePred.failureProbability * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-1">Model Classifier Version</span>
+                <span className="text-xs font-mono font-bold text-slate-200 block">{failurePred.modelVersion}</span>
+              </div>
+            </div>
+
+            {/* Contributing Important Features */}
+            {failurePred.importantFeatures && failurePred.importantFeatures.length > 0 && (
+              <div className="pt-3 border-t border-slate-800">
+                <span className="text-xs font-bold text-slate-300 block mb-2">Key Contributing Telemetry Factors:</span>
+                <div className="flex flex-wrap gap-2">
+                  {failurePred.importantFeatures.map((f, idx) => (
+                    <span key={idx} className="bg-slate-800 text-slate-200 border border-slate-700 px-3 py-1 rounded-lg text-xs font-mono">
+                      {f.feature}: <strong className="text-indigo-400">{(f.score * 100).toFixed(0)}%</strong>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Disclaimer Notice */}
+            <div className="p-3 bg-slate-800/60 border border-slate-700/80 rounded-lg flex items-center gap-2 text-[11px] text-slate-400">
+              <Info className="w-4 h-4 text-blue-400 shrink-0" />
+              <span>{failurePred.disclaimer || "Predictions are probabilistic estimates based on telemetry trends and do not guarantee physical machine outcomes."}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-slate-900/50 p-5 rounded-xl border border-slate-700 text-center text-xs text-slate-400">
+            Click <strong className="text-indigo-400">"Evaluate Failure Risk"</strong> to trigger real-time AI failure mode classification.
+          </div>
+        )}
+      </div>
+
+      {/* Mounted Sensors & Prediction History Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Mounted Sensors & Latest Telemetry */}
+        {/* Mounted Sensors */}
         <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 shadow-lg">
           <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-blue-400" /> Mounted Sensors & Latest Telemetry Values
+            <Cpu className="w-5 h-5 text-blue-400" /> Mounted Telemetry Sensors
           </h3>
 
           {detail.sensors && detail.sensors.length > 0 ? (
@@ -172,10 +273,10 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
           )}
         </div>
 
-        {/* AI Predictions & Anomaly Scores */}
+        {/* Prediction History Timeline */}
         <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 shadow-lg">
           <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-            <Brain className="w-5 h-5 text-indigo-400" /> AI Machine Learning Predictions
+            <History className="w-5 h-5 text-indigo-400" /> Historical ML Predictions Log
           </h3>
 
           {detail.predictions && detail.predictions.length > 0 ? (
@@ -208,77 +309,12 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
           ) : (
             <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60 text-xs">
               <div className="flex justify-between items-center mb-2">
-                <span className="font-bold text-indigo-400">IsolationForest RUL Model</span>
-                <span className="text-[10px] text-emerald-400 font-bold">ONLINE</span>
+                <span className="font-bold text-indigo-400">RandomForest / IsolationForest Pipeline</span>
+                <span className="text-[10px] text-emerald-400 font-bold">READY</span>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-slate-800">
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Failure Risk</span>
-                  <span className="font-bold text-emerald-400">3.4%</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Estimated RUL</span>
-                  <span className="font-bold text-white">420 hrs</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Anomaly Score</span>
-                  <span className="font-bold text-indigo-300">0.034</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Bottom Grid: Active Alerts + Maintenance History */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Active Alerts */}
-        <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 shadow-lg">
-          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-400" /> Active Machine Alerts
-          </h3>
-          {detail.activeAlerts && detail.activeAlerts.length > 0 ? (
-            <div className="space-y-2.5">
-              {detail.activeAlerts.map((a) => (
-                <div key={a.id} className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl flex justify-between items-center text-xs">
-                  <div>
-                    <span className="font-bold text-amber-400 block">{a.severity}</span>
-                    <span className="text-slate-200 mt-0.5 block">{a.alertMessage}</span>
-                  </div>
-                  <span className="text-[10px] text-slate-400">{new Date(a.triggeredAt).toLocaleTimeString()}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-slate-900/40 p-4 rounded-xl text-center text-slate-400 text-xs">
-              No active unacknowledged alerts for this machine.
-            </div>
-          )}
-        </div>
-
-        {/* Maintenance History */}
-        <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 shadow-lg">
-          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-            <Wrench className="w-5 h-5 text-emerald-400" /> Maintenance Service History
-          </h3>
-          {detail.maintenanceHistory && detail.maintenanceHistory.length > 0 ? (
-            <div className="space-y-2.5">
-              {detail.maintenanceHistory.map((m) => (
-                <div key={m.id} className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 text-xs flex justify-between items-center">
-                  <div>
-                    <span className="font-bold text-white">{m.maintenanceType}</span>
-                    <span className="text-slate-400 block mt-0.5">{m.description}</span>
-                  </div>
-                  <div className="text-right text-[11px]">
-                    <span className="font-semibold text-emerald-400">${m.cost || '0.00'}</span>
-                    <span className="text-slate-500 block">{new Date(m.servicedAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-slate-900/40 p-4 rounded-xl text-center text-slate-400 text-xs">
-              No past maintenance records recorded.
+              <p className="text-[11px] text-slate-400 mt-1">
+                Evaluate failure risk to populate predictive history logs.
+              </p>
             </div>
           )}
         </div>
