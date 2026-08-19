@@ -8,7 +8,8 @@ import MachineListPage from './components/MachineListPage';
 import MachineDetailPage from './components/MachineDetailPage';
 import MachineFormPage from './components/MachineFormPage';
 import SensorListPage from './components/SensorListPage';
-import { Activity, Server, Cpu, LayoutDashboard, LogOut, UserCheck } from 'lucide-react';
+import MaintenanceDashboardPage from './components/MaintenanceDashboardPage';
+import { Activity, Server, Cpu, LayoutDashboard, LogOut, UserCheck, Wrench } from 'lucide-react';
 
 function NavigationHeader({ currentRoute, onNavigate }) {
   const { user, role, logout } = useAuth();
@@ -58,6 +59,17 @@ function NavigationHeader({ currentRoute, onNavigate }) {
           >
             <Cpu className="w-3.5 h-3.5" /> Telemetry Sensors
           </button>
+
+          <button
+            onClick={() => onNavigate('/maintenance')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+              currentRoute.startsWith('/maintenance')
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <Wrench className="w-3.5 h-3.5" /> Maintenance Work Orders
+          </button>
         </nav>
       </div>
 
@@ -92,7 +104,7 @@ function NavigationHeader({ currentRoute, onNavigate }) {
 
 function MainApp() {
   const { isAuthenticated, loading } = useAuth();
-  const [authView, setAuthView] = useState('login'); // 'login' | 'register'
+  const [authView, setAuthView] = useState('login');
   const [route, setRoute] = useState('/');
   const [activeMachineId, setActiveMachineId] = useState(null);
 
@@ -128,6 +140,10 @@ function MainApp() {
           />
         ) : route === '/sensors' ? (
           <SensorListPage />
+        ) : route === '/maintenance' ? (
+          <MaintenanceDashboardPage
+            onNavigateMachine={(id) => navigateTo('/machines/detail', id)}
+          />
         ) : route === '/machines/new' ? (
           <MachineFormPage
             onBack={() => navigateTo('/machines')}

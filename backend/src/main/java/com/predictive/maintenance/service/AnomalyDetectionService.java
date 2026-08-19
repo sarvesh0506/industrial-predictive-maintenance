@@ -35,6 +35,7 @@ public class AnomalyDetectionService {
     private final PredictionRepository predictionRepository;
     private final AlertRepository alertRepository;
     private final MlClientService mlClientService;
+    private final MaintenanceService maintenanceService;
 
     @Transactional
     public AnomalyPredictionResponseDTO evaluateMachineTelemetry(Long machineId) {
@@ -71,13 +72,19 @@ public class AnomalyDetectionService {
                 || predictionDTO.getAnomalyScore() >= 0.70;
 
         if (isAnomalous) {
-            handleAnomalousCondition(machine, predictionDTO);
+            handleAnomalousCondition(machine, predictionDTO, failureProb, rulHours);
         }
 
         return predictionDTO;
     }
 
-    private void handleAnomalousCondition(Machine machine, AnomalyPredictionResponseDTO predictionDTO) {
+    private void handleAnomalousCondition(Machine machine, AnomalyPredictionResponseDTO predictionDTO, double failureProb, double rulHours) {
+        // Trigger Automated AI Maintenance Recommendation
+        String recReason = String.format(Locale.US,
+                "Anomaly Score: %.2f | Failure Prob: %.0f%% | RUL Estimate: %.0fh",
+                predictionDTO.getAnomalyScore(), failureProb * 100, rulHours);
+        maintenanceService.triggerAiRecommendation(machine, recReason, "CRITICAL");
+
         // Deduplication Check: Search for unacknowledged active alerts for this machine
         List<Alert> existingActiveAlerts = alertRepository.findByMachineIdAndIsAcknowledgedFalse(machine.getId());
 
