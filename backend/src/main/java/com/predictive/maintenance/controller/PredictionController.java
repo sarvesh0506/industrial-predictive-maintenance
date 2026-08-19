@@ -2,6 +2,7 @@ package com.predictive.maintenance.controller;
 
 import com.predictive.maintenance.dto.AnomalyPredictionResponseDTO;
 import com.predictive.maintenance.dto.FailurePredictionResponseDTO;
+import com.predictive.maintenance.dto.RulPredictionResponseDTO;
 import com.predictive.maintenance.entity.Prediction;
 import com.predictive.maintenance.repository.PredictionRepository;
 import com.predictive.maintenance.service.AnomalyDetectionService;
@@ -38,6 +39,14 @@ public class PredictionController {
         AnomalyPredictionResponseDTO anomalyRes = anomalyDetectionService.evaluateMachineTelemetry(machineId);
         FailurePredictionResponseDTO failureRes = mlClientService.getFailurePrediction(anomalyRes.getMachineId(), new ArrayList<>());
         return ResponseEntity.ok(failureRes);
+    }
+
+    @PostMapping("/rul/evaluate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
+    public ResponseEntity<RulPredictionResponseDTO> evaluateMachineRul(@RequestParam Long machineId) {
+        AnomalyPredictionResponseDTO anomalyRes = anomalyDetectionService.evaluateMachineTelemetry(machineId);
+        RulPredictionResponseDTO rulRes = mlClientService.getRulPrediction(anomalyRes.getMachineId(), new ArrayList<>());
+        return ResponseEntity.ok(rulRes);
     }
 
     @GetMapping("/machine/{machineId}")

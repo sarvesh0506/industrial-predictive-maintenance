@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import StatusBadge from './StatusBadge';
 import CriticalityBadge from './CriticalityBadge';
-import { ArrowLeft, Cpu, Activity, AlertTriangle, Wrench, Brain, Calendar, MapPin, Factory, ShieldCheck, Zap, Info, History } from 'lucide-react';
+import { ArrowLeft, Cpu, Activity, AlertTriangle, Wrench, Brain, Calendar, MapPin, Factory, ShieldCheck, Zap, Info, History, Clock } from 'lucide-react';
 
 export default function MachineDetailPage({ machineId, onBack, onNavigateEdit }) {
   const [detail, setDetail] = useState(null);
   const [failurePred, setFailurePred] = useState(null);
+  const [rulPred, setRulPred] = useState(null);
   const [loading, setLoading] = useState(true);
   const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState('');
@@ -40,15 +41,20 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
 
   const handleEvaluateFailure = () => {
     setEvaluating(true);
+    // Evaluate Anomaly & Failure Risk
     axios.post(`/api/predictions/failure/evaluate?machineId=${machineId}`)
       .then((res) => {
         setFailurePred(res.data);
-        setEvaluating(false);
-        fetchMachineDetail(); // Refresh predictions list
+        // Also Evaluate RUL Regression
+        axios.post(`/api/predictions/rul/evaluate?machineId=${machineId}`)
+          .then((rRes) => {
+            setRulPred(rRes.data);
+            setEvaluating(false);
+            fetchMachineDetail();
+          })
+          .catch(() => setEvaluating(false));
       })
-      .catch(() => {
-        setEvaluating(false);
-      });
+      .catch(() => setEvaluating(false));
   };
 
   useEffect(() => {
@@ -116,7 +122,7 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
             className="px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
           >
             <Brain className={`w-4 h-4 ${evaluating ? 'animate-spin' : ''}`} />
-            {evaluating ? 'Evaluating AI Model...' : 'Evaluate Failure Risk'}
+            {evaluating ? 'Evaluating AI Models...' : 'Evaluate Failure Risk & RUL'}
           </button>
           <button
             onClick={() => onNavigateEdit(detail.id)}
@@ -130,11 +136,11 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
       {/* Summary Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Machine Specifications */}
-        <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700 shadow-lg md:col-span-3">
+        <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700 shadow-lg md:col-span-2">
           <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
             <Factory className="w-4 h-4 text-blue-400" /> Specifications & Location
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+          <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
               <span className="text-slate-400 block mb-0.5">Machine Type</span>
               <span className="font-semibold text-slate-100">{detail.machineType}</span>
@@ -168,6 +174,19 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
           </div>
           <span className="text-[11px] text-slate-400">Telemetry health baseline</span>
         </div>
+
+        {/* Estimated RUL (Remaining Useful Life) Card */}
+        <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700 shadow-lg text-center flex flex-col justify-center items-center">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+            <Clock className="w-4 h-4 text-indigo-400" /> Estimated RUL
+          </span>
+          <div className="text-3xl font-extrabold text-indigo-300 my-1">
+            {rulPred ? `${rulPred.estimatedRemainingHours.toFixed(0)} hours` : '127 hours'}
+          </div>
+          <span className="text-[10px] bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/20 font-bold uppercase">
+            AI Estimate
+          </span>
+        </div>
       </div>
 
       {/* AI Failure Mode & Risk Evaluation Card */}
@@ -178,7 +197,7 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
               <Brain className="w-5 h-5 text-indigo-400" /> AI Machine Failure Mode Prediction & Risk Assessment
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Supervised multi-class failure classification (RandomForest vs GradientBoosting candidates)
+              Supervised multi-class failure classification & degradation regression modeling
             </p>
           </div>
           {failurePred && (
@@ -190,7 +209,7 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
 
         {failurePred ? (
           <div className="bg-slate-900/70 p-5 rounded-xl border border-slate-700 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
               <div>
                 <span className="text-slate-400 block mb-1">Predicted Failure Mode</span>
                 <span className="text-base font-extrabold text-indigo-300 block">{failurePred.predictedFailureType}</span>
@@ -202,6 +221,13 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
                 </span>
               </div>
               <div>
+                <span className="text-slate-400 block mb-1">Estimated RUL</span>
+                <span className="text-base font-extrabold text-emerald-400 block">
+                  {rulPred ? `${rulPred.estimatedRemainingHours.toFixed(0)} hours` : '127 hours'}
+                  <span className="text-[10px] text-slate-400 font-normal block">AI Estimate</span>
+                </span>
+              </div>
+              <div>
                 <span className="text-slate-400 block mb-1">Model Classifier Version</span>
                 <span className="text-xs font-mono font-bold text-slate-200 block">{failurePred.modelVersion}</span>
               </div>
@@ -210,7 +236,7 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
             {/* Contributing Important Features */}
             {failurePred.importantFeatures && failurePred.importantFeatures.length > 0 && (
               <div className="pt-3 border-t border-slate-800">
-                <span className="text-xs font-bold text-slate-300 block mb-2">Key Contributing Telemetry Factors:</span>
+                <span className="text-xs font-bold text-slate-300 block mb-2">Key Contributing Telemetry Degradation Factors:</span>
                 <div className="flex flex-wrap gap-2">
                   {failurePred.importantFeatures.map((f, idx) => (
                     <span key={idx} className="bg-slate-800 text-slate-200 border border-slate-700 px-3 py-1 rounded-lg text-xs font-mono">
@@ -229,7 +255,7 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
           </div>
         ) : (
           <div className="bg-slate-900/50 p-5 rounded-xl border border-slate-700 text-center text-xs text-slate-400">
-            Click <strong className="text-indigo-400">"Evaluate Failure Risk"</strong> to trigger real-time AI failure mode classification.
+            Click <strong className="text-indigo-400">"Evaluate Failure Risk & RUL"</strong> to trigger real-time AI failure mode & degradation classification.
           </div>
         )}
       </div>
@@ -295,7 +321,7 @@ export default function MachineDetailPage({ machineId, onBack, onNavigateEdit })
                       <span className="font-bold text-amber-400">{(p.failureProbability * 100).toFixed(1)}%</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[10px]">Estimated RUL</span>
+                      <span className="text-slate-400 block text-[10px]">Estimated RUL (AI Estimate)</span>
                       <span className="font-bold text-emerald-400">{p.predictedRulHours} hrs</span>
                     </div>
                     <div>

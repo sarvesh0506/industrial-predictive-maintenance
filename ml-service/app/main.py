@@ -10,21 +10,24 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from models.anomaly_detector import IsolationForestAnomalyDetector
 from models.failure_predictor import MachineFailurePredictor
+from models.rul_predictor import RulPredictor
 from training.generate_failure_dataset import generate_synthetic_failure_dataset
 
 app = FastAPI(
     title="Industrial Predictive Maintenance AI Microservice",
-    description="Real-Time AI Anomaly Detection, Machine Failure Mode Prediction & Risk Assessment Engine",
+    description="Real-Time AI Anomaly Detection, Machine Failure Classification & RUL Prediction Engine",
     version="1.0.0"
 )
 
 anomaly_detector = IsolationForestAnomalyDetector()
 failure_predictor = MachineFailurePredictor()
+rul_predictor = RulPredictor()
 
 @app.on_event("startup")
 def startup_event():
     anomaly_detector.load_artifacts()
     failure_predictor.load_artifacts()
+    rul_predictor.load_artifacts()
 
 class TelemetryReadingItem(BaseModel):
     machineId: Optional[str] = "MCH-CNC-001"
@@ -39,7 +42,7 @@ class TelemetryReadingItem(BaseModel):
 class PredictRequest(BaseModel):
     readings: List[TelemetryReadingItem]
 
-class FailureTrainRequest(BaseModel):
+class TrainRequest(BaseModel):
     samplesPerClass: Optional[int] = 120
 
 @app.get("/health")
@@ -49,7 +52,8 @@ def health_check():
         "service": "ml-predictive-maintenance",
         "anomalyModelLoaded": anomaly_detector.is_loaded,
         "failureModelLoaded": failure_predictor.is_loaded,
-        "modelVersion": failure_predictor.model_version
+        "rulModelLoaded": rul_predictor.is_loaded,
+        "modelVersion": rul_predictor.model_version
     }
 
 # Anomaly Detection Endpoints
@@ -86,9 +90,9 @@ def predict_anomaly(request: PredictRequest):
     data = [item.model_dump() for item in request.readings]
     return anomaly_detector.predict(data)
 
-# Machine Failure Prediction Endpoints
+# Machine Failure Mode Prediction Endpoints
 @app.post("/ml/failure/train")
-def train_failure_model(request: FailureTrainRequest):
+def train_failure_model(request: TrainRequest):
     samples = request.samplesPerClass if request.samplesPerClass else 120
     df_synth = generate_synthetic_failure_dataset(samples_per_class=samples)
     result = failure_predictor.train_and_evaluate(df_synth)
@@ -100,6 +104,21 @@ def predict_failure(request: PredictRequest):
         raise HTTPException(status_code=400, detail="Readings payload cannot be empty.")
     data = [item.model_dump() for item in request.readings]
     return failure_predictor.predict(data)
+
+# Remaining Useful Life (RUL) Prediction Endpoints
+@app.post("/ml/rul/train")
+def train_rul_model(request: TrainRequest):
+    samples = request.samplesPerClass if request.samplesPerClass else 120
+    df_synth = generate_synthetic_failure_dataset(samples_per_class=samples)
+    result = rul_predictor.train_and_evaluate(df_synth)
+    return result
+
+@app.post("/ml/rul/predict")
+def predict_rul(request: PredictRequest):
+    if not request.readings:
+        raise HTTPException(status_code=400, detail="Readings payload cannot be empty.")
+    data = [item.model_dump() for item in request.readings]
+    return rul_predictor.predict(data)
 
 if __name__ == "__main__":
     import uvicorn

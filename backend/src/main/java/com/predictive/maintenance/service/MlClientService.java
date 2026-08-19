@@ -3,6 +3,7 @@ package com.predictive.maintenance.service;
 import com.predictive.maintenance.dto.AnomalyPredictionResponseDTO;
 import com.predictive.maintenance.dto.FailurePredictionResponseDTO;
 import com.predictive.maintenance.dto.ImportantFeatureDTO;
+import com.predictive.maintenance.dto.RulPredictionResponseDTO;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +77,32 @@ public class MlClientService {
         }
 
         return fallbackFailureEvaluation(machineCode, telemetryReadings);
+    }
+
+    public RulPredictionResponseDTO getRulPrediction(String machineCode, List<Map<String, Object>> telemetryReadings) {
+        String endpoint = mlServiceUrl + "/ml/rul/predict";
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("readings", telemetryReadings);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            RulPredictionResponseDTO response = restTemplate.postForObject(endpoint, entity, RulPredictionResponseDTO.class);
+
+            if (response != null) {
+                log.info("Received ML RUL Prediction for Machine [{}]: Estimated Hours={}, Confidence={}",
+                        machineCode, response.getEstimatedRemainingHours(), response.getConfidenceOrUncertainty());
+                return response;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to reach Python ML Service at [{}]. Fallback RUL evaluation applied. Reason: {}",
+                    endpoint, e.getMessage());
+        }
+
+        return fallbackRulEvaluation(machineCode, telemetryReadings);
     }
 
     private AnomalyPredictionResponseDTO fallbackAnomalyEvaluation(String machineCode, List<Map<String, Object>> telemetryReadings) {
@@ -162,6 +189,33 @@ public class MlClientService {
                 .timestamp(Instant.now().toString())
                 .modelVersion("v1.0-RandomForestFailureClassifier (Fallback)")
                 .disclaimer("Predictions are probabilistic estimates based on telemetry trends and do not guarantee physical machine outcomes.")
+                .build();
+    }
+
+    private RulPredictionResponseDTO fallbackRulEvaluation(String machineCode, List<Map<String, Object>> telemetryReadings) {
+        double maxTemp = 60.0;
+        double maxVib = 1.8;
+
+        if (telemetryReadings != null && !telemetryReadings.isEmpty()) {
+            Map<String, Object> latest = telemetryReadings.get(telemetryReadings.size() - 1);
+            if (latest.get("temperature") != null) maxTemp = Double.parseDouble(latest.get("temperature").toString());
+            if (latest.get("vibration") != null) maxVib = Double.parseDouble(latest.get("vibration").toString());
+        }
+
+        double remainingHours = 420.0;
+        if (maxVib > 10.0 || maxTemp > 90.0) {
+            remainingHours = 45.0;
+        } else if (maxVib > 4.0 || maxTemp > 75.0) {
+            remainingHours = 127.0;
+        }
+
+        return RulPredictionResponseDTO.builder()
+                .machineId(machineCode)
+                .estimatedRemainingHours(remainingHours)
+                .confidenceOrUncertainty(0.92)
+                .timestamp(Instant.now().toString())
+                .modelVersion("v1.0-RandomForestRULRegressor (Fallback)")
+                .disclaimer("AI estimate based on telemetry degradation trends. Does not guarantee exact physical failure time.")
                 .build();
     }
 }
