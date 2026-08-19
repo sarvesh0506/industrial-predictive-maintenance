@@ -30,6 +30,22 @@ services:
     volumes:
       - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf
 
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: ipm-ml-service
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ml/anomaly/status')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   backend:
     build:
       context: ./backend
@@ -42,20 +58,15 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/predictive_maintenance_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgrespassword
+      MQTT_BROKER_URL: tcp://mqtt:1883
+      ML_SERVICE_URL: http://ml-service:8000
     depends_on:
       database:
         condition: service_healthy
-
-  ml-service:
-    build:
-      context: ./ml-service
-      dockerfile: Dockerfile
-    container_name: ipm-ml-service
-    restart: always
-    ports:
-      - "8000:8000"
-    environment:
-      PORT: 8000
+      mqtt:
+        condition: service_started
+      ml-service:
+        condition: service_started
 
   frontend:
     build:
@@ -67,7 +78,21 @@ services:
       - "3000:80"
     depends_on:
       - backend
-      - ml-service
+
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    container_name: ipm-simulator
+    restart: always
+    environment:
+      MQTT_BROKER_URL: mqtt
+      MQTT_PORT: 1883
+      SIMULATOR_NUM_MACHINES: 10
+      SIMULATOR_PUBLISH_INTERVAL: 5.0
+    depends_on:
+      - mqtt
+      - backend
 
 volumes:
   postgres_data:
