@@ -1,61 +1,51 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import os
+import sys
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
-import datetime
+from typing import List, Optional, Dict, Any
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from inference.predict import PredictiveInferenceEngine
 
 app = FastAPI(
-    title="Industrial Predictive Maintenance AI Service",
-    description="FastAPI service for anomaly detection and Remaining Useful Life (RUL) predictions",
+    title="Industrial Predictive Maintenance ML Microservice",
+    description="Real-time Anomaly Detection, Feature Engineering & RUL Estimation Service",
     version="1.0.0"
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+inference_engine = PredictiveInferenceEngine()
 
-class TelemetryPayload(BaseModel):
-    sensor_id: int
-    sensor_type: str
-    values: List[float]
+class TelemetryReadingItem(BaseModel):
+    machineId: Optional[str] = "MCH-CNC-001"
+    timestamp: Optional[str] = None
+    temperature: float
+    vibration: float
+    pressure: float
+    rpm: float
+    current: float
+    voltage: Optional[float] = 400.0
 
-class PredictionResult(BaseModel):
-    machine_id: int
-    failure_probability: float
-    predicted_rul_hours: float
-    anomaly_score: float
-    status: str
-    timestamp: str
+class PredictRequest(BaseModel):
+    readings: List[TelemetryReadingItem]
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint required by platform specifications."""
     return {
         "status": "healthy",
-        "service": "ml-service",
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+        "service": "ml-predictive-maintenance",
+        "model_loaded": inference_engine.is_loaded
     }
 
-@app.post("/predict", response_model=PredictionResult)
-def predict_machine_health(payload: TelemetryPayload):
-    """Predict machine failure probability and RUL based on sensor telemetry."""
-    avg_val = sum(payload.values) / max(len(payload.values), 1)
+@app.post("/predict")
+def predict_anomaly_and_rul(request: PredictRequest):
+    if not request.readings:
+        raise HTTPException(status_code=400, detail="Readings payload cannot be empty.")
     
-    # Baseline dummy heuristic model for initial setup
-    anomaly_score = max(0.0, min(1.0, (avg_val - 50.0) / 50.0))
-    failure_probability = round(anomaly_score * 0.85, 4)
-    rul_hours = round(max(10.0, 1000.0 * (1.0 - anomaly_score)), 1)
-    status = "WARNING" if anomaly_score > 0.6 else "HEALTHY"
+    data = [item.model_dump() for item in request.readings]
+    result = inference_engine.predict(data)
+    return result
 
-    return PredictionResult(
-        machine_id=payload.sensor_id,
-        failure_probability=failure_probability,
-        predicted_rul_hours=rul_hours,
-        anomaly_score=round(anomaly_score, 4),
-        status=status,
-        timestamp=datetime.datetime.utcnow().isoformat() + "Z"
-    )
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

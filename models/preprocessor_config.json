@@ -1,0 +1,13 @@
+{
+  "window_size": 5,
+  "iqr_factor": 1.5,
+  "cleaner_medians": {
+    "temperature": 64.80444414757454,
+    "vibration": 2.808480710488991,
+    "pressure": 5.018429270627509,
+    "rpm": 2924.0056362639025,
+    "current": 15.96120467389691,
+    "voltage": 399.98984866697106
+  },
+  "is_fitted": true
+}
