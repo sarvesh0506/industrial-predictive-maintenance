@@ -10,7 +10,8 @@ import MachineFormPage from './components/MachineFormPage';
 import SensorListPage from './components/SensorListPage';
 import MaintenanceDashboardPage from './components/MaintenanceDashboardPage';
 import AlertsCenterPage from './components/AlertsCenterPage';
-import { Activity, Server, Cpu, LayoutDashboard, LogOut, UserCheck, Wrench, Bell } from 'lucide-react';
+import AnalyticsDashboardPage from './components/AnalyticsDashboardPage';
+import { Activity, Server, Cpu, LayoutDashboard, LogOut, UserCheck, Wrench, Bell, TrendingUp } from 'lucide-react';
 
 function NavigationHeader({ currentRoute, onNavigate }) {
   const { user, role, logout } = useAuth();
@@ -81,6 +82,17 @@ function NavigationHeader({ currentRoute, onNavigate }) {
             }`}
           >
             <Wrench className="w-3.5 h-3.5" /> Maintenance Work Orders
+          </button>
+
+          <button
+            onClick={() => onNavigate('/analytics')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+              currentRoute.startsWith('/analytics')
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5" /> Analytics & KPIs
           </button>
         </nav>
       </div>
@@ -160,6 +172,8 @@ function MainApp() {
           <MaintenanceDashboardPage
             onNavigateMachine={(id) => navigateTo('/machines/detail', id)}
           />
+        ) : route === '/analytics' ? (
+          <AnalyticsDashboardPage />
         ) : route === '/machines/new' ? (
           <MachineFormPage
             onBack={() => navigateTo('/machines')}
